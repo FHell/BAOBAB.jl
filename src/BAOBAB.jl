@@ -4,6 +4,7 @@ using Distributed: pmap, @everywhere
 
 
 using JLD2
+using FileIO
 
 export experiment, ExpPars
 
@@ -14,7 +15,7 @@ struct ExpPars
 end
 
 function individual_run(generate_data, exp_pars::ExpPars,  batch_number, run_number, input_data)
-    run_name = joinpath(exp_pars.tmp_dir, "batch_$(batch_number)_run_$(run_number).data")
+    run_name = joinpath(exp_pars.tmp_dir, "batch_$(batch_number)_run_$(run_number).jld")
     println(run_name)
     data = generate_data(batch_number, run_number, input_data)
 
@@ -25,17 +26,26 @@ function individual_run(generate_data, exp_pars::ExpPars,  batch_number, run_num
     (batch_number, run_number, run_name)
 end
 
-function experiment(generate_data, exp_pars::ExpPars, input_data::Array{T, 2}) where T
+function aggregate_batch(aggregate, runnames, exp_pars::ExpPars)
+    datum = load("tmp/batch_1_run_1.jld", "data")
+    T = typeof(datum)
+    batch_data = [load(runname, "data") for runname in runnames]
+    aggregate(batch_data)
+end
+
+function experiment(generate_data, aggregate, exp_pars::ExpPars, input_data::Array{T, 2}) where T
     # input_data needs to be indexable as [r,b] where r indexes the runs
     # and b indexes the batches.
 
     mkpath(exp_pars.tmp_dir)
 
+    # This distributes the variables to all processes
     @everywhere generate_data = $generate_data
     @everywhere exp_pars = $exp_pars
     @everywhere input_data = $input_data
 
-    # This distributes the variables to all processes
+    # enumerated_data and f will be distributed by pmap.
+
     enumerated_data = Array{Tuple{Int, Int, T}, 1}()
     for b in 1:exp_pars.n_batches
         for r in 1:exp_pars.runs_per_batch
@@ -50,7 +60,14 @@ function experiment(generate_data, exp_pars::ExpPars, input_data::Array{T, 2}) w
 
     runfiles = pmap(f, enumerated_data)
 
-    runfiles
+    batchfiles = [["" for r in 1:exp_pars.runs_per_batch] for b in 1:exp_pars.n_batches]
+    for (b, r, name) in runfiles
+        batchfiles[b][r] = name
+    end
+
+    g = (runfiles) -> aggregate_batch(aggregate, runfiles, exp_pars::ExpPars)
+
+    pmap(g, batchfiles)
 end
 
 
