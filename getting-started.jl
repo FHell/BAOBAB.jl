@@ -11,6 +11,7 @@ addprocs(2)
     exp_pars = ExpPars("tmp", 4, 3)
 
     function generate_data(b, r, input_datum)
+        # given the batch and run that we are in, generate the expeirmental data
         println("Batch $b, Run $r, input datum $input_datum")
         input_datum
     end
