@@ -27,7 +27,7 @@ function individual_run(generate_data, exp_pars::ExpPars,  batch_number, run_num
 end
 
 function aggregate_batch(aggregate, runnames, exp_pars::ExpPars)
-    datum = load("tmp/batch_1_run_1.jld", "data")
+    datum = load(runnames[1], "data")
     T = typeof(datum)
     batch_data = [load(runname, "data") for runname in runnames]
     aggregate(batch_data)
@@ -40,9 +40,10 @@ function experiment(generate_data, aggregate, exp_pars::ExpPars, input_data::Arr
     mkpath(exp_pars.tmp_dir)
 
     # This distributes the variables to all processes
-    @everywhere generate_data = $generate_data
-    @everywhere exp_pars = $exp_pars
-    @everywhere input_data = $input_data
+    # @everywhere generate_data = $generate_data
+    # @everywhere exp_pars = $exp_pars
+    # @everywhere input_data = $input_data
+    # @everywhere aggregate = $aggregate
 
     # enumerated_data and f will be distributed by pmap.
 
